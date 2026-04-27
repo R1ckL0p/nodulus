@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using UnityEngine;
 
 namespace View.Control
@@ -60,9 +61,10 @@ namespace View.Control
         /// <summary>
         /// Plays the given sound clip with the specified parameters.
         /// </summary>
-        public void Play(GameClip clip, float delay = 0f, float volume = 1f, float startTime = 0f)
+public void Play(GameClip clip, float delay = 0f, float volume = 1f, float startTime = 0f)
 {
     if (!enabled || !SfxEnabled) return;
+    UnityEngine.Debug.Log($"GameAudio.Play llamado: {clip}");
     NodulusAudioManager.Instance?.PlaySFX(clip.ToString());
 }
 
