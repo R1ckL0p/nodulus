@@ -156,22 +156,43 @@ float NoteToFreq(string note)
             case "MovePushHigh":
             case "MovePullHigh":
                 // FM — movimiento pieza alta
-                v.SetSFX(440f, OSC.WaveType.Sine, 5, 80, 100, 0.5f,
-                         fm: true, fmRatio: 3.5f, fmIndex: 2f);
+                v.waveType     = OSC.WaveType.SA;
+                v.f            = 523f;
+                v.Armonicos    = 4;
+                v.AmplitudesSA = new float[10] { 1f, 0.5f, 0.2f, 0.1f, 0f, 0f, 0f, 0f, 0f, 0f };
+                v.A = 5; v.D = 80; v.S = 100; v.SL = 0.4f;
+                v.vibratoEnabled   = true;
+                v.vibratoRate      = 8f;
+                v.vibratoIntensity = 0.012f;
+                v.UpdateADSR();
                 break;
 
             case "MovePushMid":
             case "MovePullMid":
                 // FM — movimiento pieza media
-                v.SetSFX(330f, OSC.WaveType.Sine, 5, 80, 100, 0.5f,
-                         fm: true, fmRatio: 2.5f, fmIndex: 1.5f);
+                v.waveType     = OSC.WaveType.SA;
+                v.f            = 392f;
+                v.Armonicos    = 4;
+                v.AmplitudesSA = new float[10] { 1f, 0.5f, 0.2f, 0.1f, 0f, 0f, 0f, 0f, 0f, 0f };
+                v.A = 5; v.D = 80; v.S = 100; v.SL = 0.4f;
+                v.vibratoEnabled   = true;
+                v.vibratoRate      = 8f;
+                v.vibratoIntensity = 0.012f;
+                v.UpdateADSR();
                 break;
 
             case "MovePushLow":
             case "MovePullLow":
                 // FM — movimiento pieza baja
-                v.SetSFX(220f, OSC.WaveType.Sine, 5, 100, 120, 0.5f,
-                         fm: true, fmRatio: 2f, fmIndex: 1.2f);
+                v.waveType     = OSC.WaveType.SA;
+                v.f            = 261f;
+                v.Armonicos    = 4;
+                v.AmplitudesSA = new float[10] { 1f, 0.5f, 0.2f, 0.1f, 0f, 0f, 0f, 0f, 0f, 0f };
+                v.A = 5; v.D = 80; v.S = 100; v.SL = 0.4f;
+                v.vibratoEnabled   = true;
+                v.vibratoRate      = 8f;
+                v.vibratoIntensity = 0.012f;
+                v.UpdateADSR();
                 break;
 
             case "ArcMoveHigh":
@@ -204,13 +225,13 @@ float NoteToFreq(string note)
 
             case "NodeRotate":
                 // Square — rotación mecánica
-                v.SetSFX(440f, OSC.WaveType.Square, 5, 40, 60, 0.4f);
+                v.SetSFX(659f, OSC.WaveType.Sine, 5, 60, 80, 0.5f);
                 break;
 
             case "InvalidRotate":
                 // FM disonante — error
-                v.SetSFX(180f, OSC.WaveType.Square, 10, 30, 80, 0.6f,
-                         fm: true, fmRatio: 1.5f, fmIndex: 3f);
+                v.SetSFX(150f, OSC.WaveType.Sine, 5, 60, 80, 0.7f,
+                         fm: true, fmRatio: 1.5f, fmIndex: 4f);
                 break;
 
             case "GameStart":
