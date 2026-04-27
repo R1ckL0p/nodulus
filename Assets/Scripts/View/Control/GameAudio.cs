@@ -61,44 +61,21 @@ namespace View.Control
         /// Plays the given sound clip with the specified parameters.
         /// </summary>
         public void Play(GameClip clip, float delay = 0f, float volume = 1f, float startTime = 0f)
-        {
-            if (!enabled || !SfxEnabled) {
-                return;
-            }
-            
-            var audioClip = SfxClips[(uint) clip];
-            LeanAudio.play(audioClip, volume, delay, time: startTime);
-        }
-        
-        /// <summary>
-        /// Plays the given music clip with the specifide parameters.
-        /// </summary>
-        public void Play(MusicClip clip, float fadeTime = 0f, float delay = 0f, float volume = 1f, float startTime = 0f)
-        {
-            if (!enabled || !MusicEnabled) {
-                return;
-            }
-            
-            var audioClip = MusicClips[(uint) clip];
-            
-            _musicSource = LeanAudio.play(audioClip, 0f, delay, true, startTime);
+{
+    if (!enabled || !SfxEnabled) return;
+    NodulusAudioManager.Instance?.PlaySFX(clip.ToString());
+}
 
-            _musicVolumeTweenId = LeanTween.value(0f, volume, fadeTime)
-                .setDelay(delay)
-                .setEase(LeanTweenType.easeInOutSine)
-                .setOnUpdate(v => {
-                    _musicSource.volume = v;
-                })
-                .id;
-        }
+public void Play(MusicClip clip, float fadeTime = 0f, float delay = 0f, float volume = 1f, float startTime = 0f)
+{
+    if (!enabled || !MusicEnabled) return;
+    NodulusAudioManager.Instance?.StartAmbientMusic();
+}
 
-        private void StartMusic()
-        {
-            // TODO: make configurable
-            const float fadeTime = 3f;
-            const float startTime = 32f;
-            Play(MusicClip.Ambient02, fadeTime: fadeTime, volume: MusicVolume, startTime: startTime);
-        }
+private void StartMusic()
+{
+    NodulusAudioManager.Instance?.StartAmbientMusic();
+}
     }
 
     /// <summary>
