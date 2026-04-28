@@ -6,19 +6,37 @@ public class NodulusAudioManager : MonoBehaviour
 {
     public static NodulusAudioManager Instance;
 
-    [Header("Voces SFX")]
+    [Header("Voces SFX (pool de 6)")]
     public OSC[] sfxVoices;
     private int sfxIndex = 0;
 
     [Header("Voz Música")]
     public OSC musicVoice;
 
-    private bool musicEnabled = true;
+    [Header("Configuración")]
+    [Range(40f, 120f)] public float musicBPM = 80f;
+    [Range(0f, 1f)] public float musicVolume = 0.12f; // Música más "pasito"
+    [Range(0f, 1f)] public float sfxVolume = 0.70f;
+
     private Coroutine musicCoroutine;
+
+    // ==========================================
+    // 🎵 TABLA DE NOTAS — Melodía Armónica (Sol Mayor)
+    // ==========================================
+    private (string note, float beats)[] ambientMelody = new (string, float)[]
+    {
+        ("G3", 2.0f), ("B3", 2.0f), ("D4", 2.0f), ("G4", 2.0f),
+        ("E4", 2.0f), ("C4", 2.0f), ("G3", 4.0f),
+        ("D4", 2.0f), ("F#4", 2.0f), ("A4", 2.0f), ("D4", 2.0f),
+        ("C4", 2.0f), ("B3", 2.0f), ("A3", 4.0f),
+        ("REST", 2.0f)
+    };
 
     void Awake()
     {
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+        DontDestroyOnLoad(gameObject);
     }
 
     void Start()
@@ -27,21 +45,8 @@ public class NodulusAudioManager : MonoBehaviour
     }
 
     // ==========================================
-    // 🎵 MÚSICA AMBIENT — Wavetable
+    // 🎵 MÚSICA AMBIENT (Mejorada para ser continua)
     // ==========================================
-   private (string note, float duration)[] ambientMelody = new (string, float)[]
-{
-    ("G4",  0.5f), ("A4",  0.5f), ("B4",  0.5f), ("C5",  0.5f),
-    ("B4",  0.5f), ("A4",  0.5f), ("G4",  1.0f),
-    ("F4",  0.5f), ("G4",  0.5f), ("A4",  0.5f), ("G4",  0.5f),
-    ("F4",  0.5f), ("E4",  0.5f), ("D4",  1.0f),
-    ("D4",  0.5f), ("E4",  0.5f), ("F4",  0.5f), ("G4",  0.5f),
-    ("A4",  0.5f), ("B4",  0.5f), ("C5",  1.5f),
-    ("B4",  0.5f), ("A4",  0.5f), ("G4",  0.5f), ("F4",  0.5f),
-    ("E4",  0.5f), ("D4",  0.5f), ("C4",  2.0f),
-    ("REST",1.0f),
-};
-
     public void StartAmbientMusic()
     {
         if (musicVoice == null) return;
@@ -50,77 +55,89 @@ public class NodulusAudioManager : MonoBehaviour
     }
 
     IEnumerator PlayAmbient()
-{
-    musicVoice.waveType     = OSC.WaveType.SA;
-    musicVoice.Armonicos    = 4;
-    musicVoice.AmplitudesSA = new float[10] { 1f, 0.4f, 0.2f, 0.1f, 0f, 0f, 0f, 0f, 0f, 0f };
-    musicVoice.vibratoEnabled   = true;
-    musicVoice.vibratoRate      = 4f;
-    musicVoice.vibratoIntensity = 0.008f;
-    musicVoice.A  = 80;
-    musicVoice.D  = 100;
-    musicVoice.SL = 0.7f;
-
-    float secondsPerBeat = 60f / 110f; // 110 BPM
-
-    while (true)
     {
-        foreach (var (note, duration) in ambientMelody)
+        // Configuración de Pad Atmosférico (Síntesis Aditiva Suave)
+        musicVoice.waveType = OSC.WaveType.Sine;
+        musicVoice.Armonicos = 3;
+        musicVoice.AmplitudesSA = new float[10] { 1f, 0.2f, 0.05f, 0f, 0f, 0f, 0f, 0f, 0f, 0f };
+
+        // LFO para calidez
+        musicVoice.vibratoEnabled = true;
+        musicVoice.vibratoRate = 2.5f;
+        musicVoice.vibratoIntensity = 0.004f;
+
+        // ADSR para Legato: Attack y Decay largos para transiciones invisibles
+        musicVoice.A = 250;
+        musicVoice.D = 400;
+        musicVoice.SL = 0.8f;
+
+        float spb = 60f / musicBPM;
+
+        while (true)
         {
-            float noteDuration  = duration * secondsPerBeat;
-            float soundDuration = noteDuration * 0.9f;
-
-            if (note == "REST")
+            foreach (var (note, beats) in ambientMelody)
             {
-                yield return new WaitForSeconds(noteDuration);
-                continue;
-            }
+                float noteDur = beats * spb;
 
-            float freq = NoteToFreq(note);
-            if (freq > 0)
-            {
-                musicVoice.S = Mathf.RoundToInt(soundDuration * 1000f);
+                if (note == "REST")
+                {
+                    yield return new WaitForSeconds(noteDur);
+                    continue;
+                }
+
+                float freq = NoteToFreq(note);
+                if (freq <= 0f) { yield return new WaitForSeconds(noteDur); continue; }
+
+                // CAMBIO CLAVE: No hay Stop(). La nota fluye a la siguiente.
+                musicVoice.S = Mathf.RoundToInt(noteDur * 1000f);
                 musicVoice.UpdateADSR();
-                musicVoice.f         = freq;
-                musicVoice.TimeIndex = 0;
-                musicVoice.Aud.volume = 0.3f;
-                musicVoice.Aud.Play();
-            }
 
-            yield return new WaitForSeconds(soundDuration);
-            musicVoice.Aud.Stop();
-            yield return new WaitForSeconds(noteDuration - soundDuration);
+                musicVoice.f = freq;
+                musicVoice.TimeIndex = 0;
+                musicVoice.Aud.volume = musicVolume;
+
+                if (!musicVoice.Aud.isPlaying) musicVoice.Aud.Play();
+
+                yield return new WaitForSeconds(noteDur);
+            }
         }
     }
-}
 
-float NoteToFreq(string note)
-{
-    switch (note)
+    static float NoteToFreq(string note)
     {
-        case "C4": return 261.63f;
-        case "D4": return 293.66f;
-        case "E4": return 329.63f;
-        case "F4": return 349.23f;
-        case "G4": return 392.00f;
-        case "A4": return 440.00f;
-        case "B4": return 493.88f;
-        case "C5": return 523.25f;
-        case "D5": return 587.33f;
-        case "E5": return 659.25f;
-        default:   return 0f;
+        switch (note)
+        {
+            case "G3": return 196.00f;
+            case "A3": return 220.00f;
+            case "B3": return 246.94f;
+            case "C4": return 261.63f;
+            case "D4": return 293.66f;
+            case "E4": return 329.63f;
+            case "F#4": return 369.99f;
+            case "G4": return 392.00f;
+            case "A4": return 440.00f;
+            case "B4": return 493.88f;
+            case "C5": return 523.25f;
+            case "D5": return 587.33f;
+            default: return 0f;
+        }
     }
-}
 
     // ==========================================
-    // 🔊 PLAY SFX
+    // 🔊 PLAY SFX — API pública
     // ==========================================
     public void PlaySFX(string eventName)
     {
         OSC voice = GetVoice();
         if (voice == null) return;
+
+        voice.fmEnabled = false;
+        voice.vibratoEnabled = false;
+        voice.tremoloEnabled = false;
+        voice.detune = 0f;
+
         ApplyPreset(voice, eventName);
-        voice.Aud.volume = 0.8f;
+        voice.Aud.volume = sfxVolume;
         voice.PlayOneShot();
     }
 
@@ -133,146 +150,136 @@ float NoteToFreq(string note)
     }
 
     // ==========================================
-    // 🎨 PRESETS POR EVENTO
+    // 🎨 PRESETS POR EVENTO (Lógica original completa)
     // ==========================================
     void ApplyPreset(OSC v, string eventName)
     {
-        v.fmEnabled      = false;
-        v.vibratoEnabled = false;
-        v.tremoloEnabled = false;
-
         switch (eventName)
         {
             case "NodeEnter":
-                // Sine suave — entrar a un nodo
-                v.SetSFX(880f, OSC.WaveType.Sine, 10, 50, 80, 0.6f);
+                v.SetSFX(880f, OSC.WaveType.Sine, 8, 50, 80, 0.6f);
                 break;
-
             case "NodeLeave":
-                // Sine descendente — salir de un nodo
                 v.SetSFX(660f, OSC.WaveType.Sine, 5, 30, 60, 0.5f);
+                break;
+            case "NodeSelect":
+                v.SetSFX(740f, OSC.WaveType.Sine, 5, 25, 50, 0.55f);
+                break;
+            case "NodeDeselect":
+                v.SetSFX(580f, OSC.WaveType.Sine, 5, 20, 40, 0.45f);
                 break;
 
             case "MovePushHigh":
             case "MovePullHigh":
-                // FM — movimiento pieza alta
-                v.waveType     = OSC.WaveType.SA;
-                v.f            = 523f;
-                v.Armonicos    = 4;
-                v.AmplitudesSA = new float[10] { 1f, 0.5f, 0.2f, 0.1f, 0f, 0f, 0f, 0f, 0f, 0f };
+                v.waveType = OSC.WaveType.SA;
+                v.f = 523f;
+                v.Armonicos = 4;
+                v.AmplitudesSA = new float[10] { 1f, 0.5f, 0.2f, 0.08f, 0f, 0f, 0f, 0f, 0f, 0f };
                 v.A = 5; v.D = 80; v.S = 100; v.SL = 0.4f;
-                v.vibratoEnabled   = true;
-                v.vibratoRate      = 8f;
-                v.vibratoIntensity = 0.012f;
+                v.vibratoEnabled = true; v.vibratoRate = 8f; v.vibratoIntensity = 0.012f;
                 v.UpdateADSR();
                 break;
 
             case "MovePushMid":
             case "MovePullMid":
-                // FM — movimiento pieza media
-                v.waveType     = OSC.WaveType.SA;
-                v.f            = 392f;
-                v.Armonicos    = 4;
-                v.AmplitudesSA = new float[10] { 1f, 0.5f, 0.2f, 0.1f, 0f, 0f, 0f, 0f, 0f, 0f };
+                v.waveType = OSC.WaveType.SA;
+                v.f = 392f;
+                v.Armonicos = 4;
+                v.AmplitudesSA = new float[10] { 1f, 0.5f, 0.2f, 0.08f, 0f, 0f, 0f, 0f, 0f, 0f };
                 v.A = 5; v.D = 80; v.S = 100; v.SL = 0.4f;
-                v.vibratoEnabled   = true;
-                v.vibratoRate      = 8f;
-                v.vibratoIntensity = 0.012f;
+                v.vibratoEnabled = true; v.vibratoRate = 8f; v.vibratoIntensity = 0.012f;
                 v.UpdateADSR();
                 break;
 
             case "MovePushLow":
             case "MovePullLow":
-                // FM — movimiento pieza baja
-                v.waveType     = OSC.WaveType.SA;
-                v.f            = 261f;
-                v.Armonicos    = 4;
-                v.AmplitudesSA = new float[10] { 1f, 0.5f, 0.2f, 0.1f, 0f, 0f, 0f, 0f, 0f, 0f };
+                v.waveType = OSC.WaveType.SA;
+                v.f = 261f;
+                v.Armonicos = 4;
+                v.AmplitudesSA = new float[10] { 1f, 0.5f, 0.2f, 0.08f, 0f, 0f, 0f, 0f, 0f, 0f };
                 v.A = 5; v.D = 80; v.S = 100; v.SL = 0.4f;
-                v.vibratoEnabled   = true;
-                v.vibratoRate      = 8f;
-                v.vibratoIntensity = 0.012f;
+                v.vibratoEnabled = true; v.vibratoRate = 8f; v.vibratoIntensity = 0.012f;
                 v.UpdateADSR();
                 break;
 
             case "ArcMoveHigh":
-                // Síntesis aditiva — arco girando
-                v.waveType     = OSC.WaveType.SA;
-                v.f            = 523f;
-                v.Armonicos    = 5;
-                v.AmplitudesSA = new float[10] { 1f, 0.6f, 0.3f, 0.15f, 0.08f, 0f, 0f, 0f, 0f, 0f };
+                v.waveType = OSC.WaveType.SA;
+                v.f = 523f;
+                v.Armonicos = 5;
+                v.AmplitudesSA = new float[10] { 1f, 0.6f, 0.3f, 0.15f, 0.06f, 0f, 0f, 0f, 0f, 0f };
                 v.A = 10; v.D = 60; v.S = 120; v.SL = 0.5f;
                 v.UpdateADSR();
                 break;
 
             case "ArcMoveMid":
-                v.waveType     = OSC.WaveType.SA;
-                v.f            = 392f;
-                v.Armonicos    = 5;
-                v.AmplitudesSA = new float[10] { 1f, 0.6f, 0.3f, 0.15f, 0.08f, 0f, 0f, 0f, 0f, 0f };
+                v.waveType = OSC.WaveType.SA;
+                v.f = 392f;
+                v.Armonicos = 5;
+                v.AmplitudesSA = new float[10] { 1f, 0.6f, 0.3f, 0.15f, 0.06f, 0f, 0f, 0f, 0f, 0f };
                 v.A = 10; v.D = 60; v.S = 120; v.SL = 0.5f;
                 v.UpdateADSR();
                 break;
 
             case "ArcMoveLow":
-                v.waveType     = OSC.WaveType.SA;
-                v.f            = 261f;
-                v.Armonicos    = 5;
-                v.AmplitudesSA = new float[10] { 1f, 0.6f, 0.3f, 0.15f, 0.08f, 0f, 0f, 0f, 0f, 0f };
+                v.waveType = OSC.WaveType.SA;
+                v.f = 261f;
+                v.Armonicos = 5;
+                v.AmplitudesSA = new float[10] { 1f, 0.6f, 0.3f, 0.15f, 0.06f, 0f, 0f, 0f, 0f, 0f };
                 v.A = 10; v.D = 60; v.S = 120; v.SL = 0.5f;
                 v.UpdateADSR();
                 break;
 
             case "NodeRotate":
-                // Square — rotación mecánica
                 v.SetSFX(659f, OSC.WaveType.Sine, 5, 60, 80, 0.5f);
                 break;
-
             case "InvalidRotate":
-                // FM disonante — error
-                v.SetSFX(150f, OSC.WaveType.Sine, 5, 60, 80, 0.7f,
-                         fm: true, fmRatio: 1.5f, fmIndex: 4f);
+                v.SetSFX(140f, OSC.WaveType.Sine, 5, 80, 100, 0.65f, fm: true, fmRatio: 1.5f, fmIndex: 4f);
                 break;
 
             case "GameStart":
-                // Síntesis aditiva brillante con vibrato
-                v.waveType     = OSC.WaveType.SA;
-                v.f            = 523f;
-                v.Armonicos    = 6;
-                v.AmplitudesSA = new float[10] { 1f, 0.8f, 0.5f, 0.3f, 0.2f, 0.1f, 0f, 0f, 0f, 0f };
+                v.waveType = OSC.WaveType.SA; v.f = 523f; v.Armonicos = 6;
+                v.AmplitudesSA = new float[10] { 1f, 0.8f, 0.5f, 0.3f, 0.15f, 0.08f, 0f, 0f, 0f, 0f };
                 v.A = 50; v.D = 100; v.S = 400; v.SL = 0.8f;
-                v.vibratoEnabled   = true;
-                v.vibratoRate      = 6f;
-                v.vibratoIntensity = 0.01f;
+                v.vibratoEnabled = true; v.vibratoRate = 6f; v.vibratoIntensity = 0.010f;
                 v.UpdateADSR();
                 break;
 
             case "WinBoard":
-                // Wavetable — victoria con tremolo
-                v.waveType     = OSC.WaveType.SA;
-                v.f            = 659f;
-                v.Armonicos    = 8;
+                v.waveType = OSC.WaveType.SA; v.f = 659f; v.Armonicos = 8;
                 v.AmplitudesSA = new float[10] { 1f, 0.9f, 0.7f, 0.5f, 0.3f, 0.2f, 0.1f, 0.05f, 0f, 0f };
-                v.A = 30; v.D = 80; v.S = 600; v.SL = 0.9f;
-                v.tremoloEnabled   = true;
-                v.tremoloRate      = 8f;
-                v.tremoloIntensity = 0.3f;
+                v.A = 30; v.D = 80; v.S = 700; v.SL = 0.9f;
+                v.tremoloEnabled = true; v.tremoloRate = 7f; v.tremoloIntensity = 0.28f;
                 v.UpdateADSR();
                 break;
 
             case "GameEnd":
-                v.SetSFX(330f, OSC.WaveType.Sine, 100, 200, 500, 0.7f,
-                         fm: true, fmRatio: 1.5f, fmIndex: 0.5f);
+                v.SetSFX(330f, OSC.WaveType.Sine, 100, 200, 500, 0.7f, fm: true, fmRatio: 1.5f, fmIndex: 0.5f);
+                break;
+            case "LevelComplete":
+                v.waveType = OSC.WaveType.SA; v.f = 587f; v.Armonicos = 5;
+                v.AmplitudesSA = new float[10] { 1f, 0.7f, 0.4f, 0.2f, 0.1f, 0f, 0f, 0f, 0f, 0f };
+                v.A = 20; v.D = 80; v.S = 300; v.SL = 0.75f;
+                v.vibratoEnabled = true; v.vibratoRate = 5f; v.vibratoIntensity = 0.008f;
+                v.UpdateADSR();
                 break;
 
             case "MenuSelect":
-                // Sine corto — UI click
                 v.SetSFX(660f, OSC.WaveType.Sine, 5, 20, 40, 0.5f);
                 break;
-
+            case "MenuBack":
+                v.SetSFX(500f, OSC.WaveType.Sine, 5, 20, 40, 0.45f);
+                break;
             case "LevelEnable":
-                // Triangle suave — nivel desbloqueado
-                v.SetSFX(440f, OSC.WaveType.Triangle, 20, 60, 100, 0.6f);
+                v.SetSFX(440f, OSC.WaveType.Triangle, 20, 60, 120, 0.6f);
+                break;
+            case "MenuOpen":
+                v.waveType = OSC.WaveType.SA; v.f = 392f; v.Armonicos = 3;
+                v.AmplitudesSA = new float[10] { 1f, 0.3f, 0.1f, 0f, 0f, 0f, 0f, 0f, 0f, 0f };
+                v.A = 30; v.D = 60; v.S = 80; v.SL = 0.4f;
+                v.UpdateADSR();
+                break;
+            case "MenuClose":
+                v.SetSFX(349f, OSC.WaveType.Sine, 10, 40, 60, 0.4f);
                 break;
 
             default:
